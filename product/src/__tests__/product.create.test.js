@@ -118,7 +118,6 @@ describe("POST /api/products", () => {
             expect(res.body.error.message).toMatch(/seller/i);
         });
     });
-
     // ═══════════════════════════════════════════════════════════════════════════
     // 3. Validation Failures (400 Bad Request)
     // ═══════════════════════════════════════════════════════════════════════════
