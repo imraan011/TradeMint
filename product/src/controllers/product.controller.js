@@ -3,7 +3,12 @@ import { ProductModel } from "../models/product.model.js";
 
 export async function productController(req, res) {
     try {
-        const { title, description, price } = req.body;
+        const { title, description} = req.body;
+
+        const price={
+            amount: Number(req.body["price.amount"]),
+            currency:req.body["price.currency"]
+        }
         const sellerId = req.user.id || req.user._id;
 
         // Kam se kam ek image zaroori hai
