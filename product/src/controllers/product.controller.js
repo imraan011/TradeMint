@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { uploadImage } from "../services/imagekit.service.js";
 import { ProductModel } from "../models/product.model.js";
 
@@ -6,15 +7,8 @@ export async function createProductController(req, res) {
     try {
         const { title, description } = req.body;
 
-        const rawAmount =
-            req.body.price?.amount ??
-            req.body["price.amount"] ??
-            req.body.amount;
-        const rawCurrency =
-            req.body.price?.currency ??
-            req.body["price.currency"] ??
-            req.body.currency ??
-            "INR";
+        const rawAmount = req.body.price?.amount ?? req.body["price.amount"] ?? req.body.amount;
+        const rawCurrency = req.body.price?.currency ?? req.body["price.currency"] ?? req.body.currency ?? "INR";
 
         const price = {
             amount: Number(rawAmount),
@@ -87,7 +81,7 @@ export async function getProductController(req, res) {
 
         const products = await ProductModel.find(filter)
             .skip(Number(skip))
-            .limit(Number(limit));
+            .limit(Math.min(Number(limit), 20)); // Limit ko 20 se zyada nahi hone denge
 
         return res.status(200).json({
             success: true,
@@ -97,7 +91,39 @@ export async function getProductController(req, res) {
     } catch (error) {
         return res.status(500).json({
             success: false,
-            error: { message: "Internal server error" },
+            error: { message: `Internal server error: ${error.message}` },
+        });
+    }
+}
+
+export async function getProductByIdController(req, res) {
+    const { id } = req.params;
+
+    // Invalid ObjectId format check
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+            success: false,
+            error: { message: "Invalid product ID format" },
+        });
+    }
+
+    try {
+        const product = await ProductModel.findById(id);
+        if(!product){
+            return res.status(404).json({
+                success: false,
+                error: { message: "Product not found" },
+            });
+        }
+        return res.status(200).json({
+            success: true,
+            message: "Product fetched successfully",
+            productData: product,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: `Internal server error: ${error.message}` },
         });
     }
 }

@@ -3,6 +3,7 @@ import multer from "multer";
 import { createAuthMiddleware } from "../middlewares/auth.middleware.js";
 import {
     createProductController,
+    getProductByIdController,
     getProductController,
 } from "../controllers/product.controller.js";
 import { createProductValidator } from "../middlewares/product.validator.js";
@@ -21,4 +22,9 @@ router.post(
 
 // GET /api/products route
 router.get("/", getProductController);
+
+//GET /api/products/:id route
+router.get("/:id", getProductByIdController);
+
+
 export default router;
