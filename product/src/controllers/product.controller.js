@@ -188,3 +188,42 @@ export async function updateProductController(req, res) {
         });
     }
 }
+
+export async function deleteProductController(req, res) {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+            success: false,
+            error: { message: "Invalid product ID" },
+        });
+    }
+
+    try {
+        const product = await ProductModel.findById(id);
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                error: { message: "Product not found" },
+            });
+        }
+
+        if (product.seller.toString() !== req.user.id && req.user.role !== "Admin" && req.user.role !== "ADMIN") {
+            return res.status(403).json({
+                success: false,
+                error: { message: "Forbidden! You can only delete your own products" },
+            });
+        }
+
+        await ProductModel.deleteOne({ _id: id });
+
+        return res.status(200).json({
+            success: true,
+            message: "Product deleted successfully",
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: `Internal server error: ${error.message}` },
+        });
+    }
+}

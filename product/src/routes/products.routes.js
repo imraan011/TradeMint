@@ -3,6 +3,7 @@ import multer from "multer";
 import { createAuthMiddleware } from "../middlewares/auth.middleware.js";
 import {
     createProductController,
+    deleteProductController,
     getProductByIdController,
     getProductController,
     updateProductController,
@@ -29,6 +30,9 @@ router.get("/:id", getProductByIdController);
 
 //PATCH /api/products/:id route // protected route
 router.patch("/:id", createAuthMiddleware(["Seller", "Admin", "SELLER", "ADMIN"]), updateProductValidator ,updateProductController);
+
+//DELETE /api/products/:id route // protected route
+router.delete("/:id", createAuthMiddleware(["Seller", "Admin", "SELLER", "ADMIN"]), deleteProductController);    
 
 export default router;
     
