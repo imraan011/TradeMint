@@ -36,3 +36,25 @@ export const createProductValidator = [
         .withMessage("Currency must be either USD or INR"),
     handleValidationErrors,
 ];
+
+export const updateProductValidator =[
+    body("title").isString().trim().optional().withMessage("Title must be a string"),
+    body("description")
+        .optional()
+        .isString()
+        .trim()
+        .isLength({ max: 500 })
+        .withMessage("Description must be a string"),
+    body("price.amount")
+        .optional()
+        .isNumeric()
+        .withMessage("Price amount must be a number")
+        .bail()
+        .isFloat({ gt: 0 })
+        .withMessage("Price amount must be greater than 0"),
+    body("price.currency")
+        .optional()
+        .isIn(["USD", "INR"])
+        .withMessage("Currency must be either USD or INR"),
+    handleValidationErrors,
+];

@@ -109,7 +109,7 @@ export async function getProductByIdController(req, res) {
 
     try {
         const product = await ProductModel.findById(id);
-        if(!product){
+        if (!product) {
             return res.status(404).json({
                 success: false,
                 error: { message: "Product not found" },
@@ -119,6 +119,67 @@ export async function getProductByIdController(req, res) {
             success: true,
             message: "Product fetched successfully",
             productData: product,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: `Internal server error: ${error.message}` },
+        });
+    }
+}
+
+export async function updateProductController(req, res) {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+            success: false,
+            error: { message: "Invalid product ID " },
+        });
+    }
+    try {
+        const product = await ProductModel.findOne({
+            _id: id,
+        });
+
+        if (!product) {
+            return res.status(404).json({
+                success: false,
+                error: { message: "Product not found " },
+            });
+        }
+
+        if (product.seller.toString() !== req.user.id && req.user.role !== "Admin" && req.user.role !== "ADMIN") {
+            return res.status(403).json({
+                success: false,
+                error: { message: "Forbidden! You can only update your own products" },
+            });
+        }
+
+        const { title, description } = req.body;
+        const rawAmount = req.body.price?.amount ?? req.body["price.amount"] ?? req.body.amount;
+        const rawCurrency = req.body.price?.currency ?? req.body["price.currency"] ?? req.body.currency;
+
+        const price = {};
+        if (rawAmount !== undefined) {
+            price.amount = Number(rawAmount);
+        }
+        if (rawCurrency !== undefined) {
+            price.currency = rawCurrency;
+        }
+
+        // Update product fields
+        if (title !== undefined) product.title = title;
+        if (description !== undefined) product.description = description;
+        if (price.amount !== undefined) product.price.amount = price.amount;
+        if (price.currency !== undefined) product.price.currency = price.currency;
+
+        await product.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Product updated successfully",
+            product,
         });
     } catch (error) {
         return res.status(500).json({
