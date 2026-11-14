@@ -149,7 +149,11 @@ export async function updateProductController(req, res) {
             });
         }
 
-        if (product.seller.toString() !== req.user.id && req.user.role !== "Admin" && req.user.role !== "ADMIN") {
+        const userRole = String(req.user.role || req.user.roles || "").toUpperCase();
+        const isAdmin = userRole === "ADMIN";
+        const userId = String(req.user.id || req.user._id);
+
+        if (product.seller.toString() !== userId && !isAdmin) {
             return res.status(403).json({
                 success: false,
                 error: { message: "Forbidden! You can only update your own products" },
@@ -207,7 +211,11 @@ export async function deleteProductController(req, res) {
             });
         }
 
-        if (product.seller.toString() !== req.user.id && req.user.role !== "Admin" && req.user.role !== "ADMIN") {
+        const userRole = String(req.user.role || req.user.roles || "").toUpperCase();
+        const isAdmin = userRole === "ADMIN";
+        const userId = String(req.user.id || req.user._id);
+
+        if (product.seller.toString() !== userId && !isAdmin) {
             return res.status(403).json({
                 success: false,
                 error: { message: "Forbidden! You can only delete your own products" },
