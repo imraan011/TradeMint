@@ -235,3 +235,26 @@ export async function deleteProductController(req, res) {
         });
     }
 }
+
+export async function getProductsBySellerController(req, res) {
+    const seller = req.user;
+
+    const { skip = 0, limit = 20 } = req.query;
+
+    try {
+        const products = await ProductModel.find({ seller: seller.id })
+            .skip(Number(skip))
+            .limit(Math.min(Number(limit), 20));
+
+        return res.status(200).json({
+            success: true,
+            message: "Products fetched successfully",
+            products,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: `Internal server error: ${error.message}` },
+        });
+    }
+}

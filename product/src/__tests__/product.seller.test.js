@@ -23,12 +23,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "test_jwt_secret";
 const generateAuthToken = (role = "SELLER", customId = null) => {
     const payload = {
         id: customId || new mongoose.Types.ObjectId().toString(),
-        username:
-            role === "SELLER"
-                ? "test_seller"
-                : role === "ADMIN"
-                  ? "test_admin"
-                  : "test_buyer",
+        username: role === "SELLER" ? "test_seller" : role === "ADMIN" ? "test_admin" : "test_buyer",
         email: `${role.toLowerCase()}@cartopia.com`,
         roles: role,
     };
@@ -71,9 +66,7 @@ describe("GET /api/products/seller", () => {
                 seller: sellerB.id,
             });
 
-            const res = await request(app)
-                .get("/api/products/seller")
-                .set("Authorization", `Bearer ${sellerAToken}`);
+            const res = await request(app).get("/api/products/seller").set("Authorization", `Bearer ${sellerAToken}`);
 
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
@@ -92,9 +85,7 @@ describe("GET /api/products/seller", () => {
         it("should return empty array when seller has no products", async () => {
             const { token: newSellerToken } = generateAuthToken("SELLER");
 
-            const res = await request(app)
-                .get("/api/products/seller")
-                .set("Authorization", `Bearer ${newSellerToken}`);
+            const res = await request(app).get("/api/products/seller").set("Authorization", `Bearer ${newSellerToken}`);
 
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
@@ -128,9 +119,7 @@ describe("GET /api/products/seller", () => {
         it("should return 403 when user has USER role instead of SELLER", async () => {
             const { token: buyerToken } = generateAuthToken("USER");
 
-            const res = await request(app)
-                .get("/api/products/seller")
-                .set("Authorization", `Bearer ${buyerToken}`);
+            const res = await request(app).get("/api/products/seller").set("Authorization", `Bearer ${buyerToken}`);
 
             expect(res.status).toBe(403);
             expect(res.body.success).toBe(false);
@@ -138,4 +127,3 @@ describe("GET /api/products/seller", () => {
         });
     });
 });
-

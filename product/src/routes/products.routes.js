@@ -6,6 +6,7 @@ import {
     deleteProductController,
     getProductByIdController,
     getProductController,
+    getProductsBySellerController,
     updateProductController,
 } from "../controllers/product.controller.js";
 import { createProductValidator, updateProductValidator } from "../middlewares/product.validator.js";
@@ -25,14 +26,21 @@ router.post(
 // GET /api/products route
 router.get("/", getProductController);
 
+// GET /api/products/seller/:sellerId route
+router.get("/seller", createAuthMiddleware(["Seller", "Admin", "SELLER", "ADMIN"]), getProductsBySellerController);
+
 //GET /api/products/:id route
 router.get("/:id", getProductByIdController);
 
 //PATCH /api/products/:id route // protected route
-router.patch("/:id", createAuthMiddleware(["Seller", "Admin", "SELLER", "ADMIN"]), updateProductValidator ,updateProductController);
+router.patch(
+    "/:id",
+    createAuthMiddleware(["Seller", "Admin", "SELLER", "ADMIN"]),
+    updateProductValidator,
+    updateProductController,
+);
 
 //DELETE /api/products/:id route // protected route
-router.delete("/:id", createAuthMiddleware(["Seller", "Admin", "SELLER", "ADMIN"]), deleteProductController);    
+router.delete("/:id", createAuthMiddleware(["Seller", "Admin", "SELLER", "ADMIN"]), deleteProductController);
 
 export default router;
-    
