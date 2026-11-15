@@ -6,7 +6,8 @@
     "scripts": {
         "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit",
         "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
-        "dev": "nodemon server.js"
+        "dev": "nodemon src/server.js",
+        "start": "node src/server.js"
     },
     "keywords": [],
     "author": "",
