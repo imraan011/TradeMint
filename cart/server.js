@@ -1,11 +1,15 @@
+import "dotenv/config";
 import { app } from "./src/app.js";
-import dotenv from "dotenv";
 import { connectDB } from "./src/db/db.js";
+import dns from "dns";
 
-dotenv.config();
+// Windows pe MongoDB Atlas SRV query issue fix karne ke liye
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
 
 connectDB();
 
-app.listen(3002, () => {
-    console.log("Cart Server is running on port 3002");
+const PORT = process.env.PORT || 3002;
+
+app.listen(PORT, () => {
+    console.log(`Cart Server is running on port ${PORT}`);
 });
