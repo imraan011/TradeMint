@@ -5,6 +5,6 @@ import { validateAddToCart } from "../middlewares/validation.middleware.js";
 
 const router = express.Router();
 
-router.post("/items", validateAddToCart, createAuthMiddleware(["USER"]), addToCartController);
+router.post("/items", createAuthMiddleware(["USER"]), validateAddToCart, addToCartController);
 
 export default router;
