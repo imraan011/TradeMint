@@ -1,5 +1,49 @@
 import CartModel from "../models/cart.model.js";
 
+export async function getCartController(req, res) {
+    try {
+        const userId = req.user?.id || req.user?._id;
+
+        const cart = await CartModel.findOne({ user: userId });
+
+        if (!cart || !cart.items || cart.items.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: "Cart is empty",
+                data: {
+                    cart: {
+                        items: [],
+                        totalAmount: 0,
+                        totalItems: 0,
+                        totalQuantity: 0,
+                    },
+                },
+            });
+        }
+
+        const totalItems = cart.items.length;
+        const totalQuantity = cart.items.reduce((total, item) => total + item.quantity, 0);
+
+        return res.status(200).json({
+            success: true,
+            message: "Cart retrieved successfully",
+            cart: {
+                _id: cart._id,
+                user: cart.user,
+                items: cart.items,
+                totalAmount: cart.totalAmount || 0,
+                totalItems,
+                totalQuantity,
+            },
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: error.message || "Failed to retrieve cart" },
+        });
+    }
+}
+
 export async function addToCartController(req, res) {
     try {
         const { productId } = req.body;
@@ -88,3 +132,5 @@ export async function updateCartItemController(req, res) {
         });
     }
 }
+
+export async function removeCartItemController(req, res) {}
