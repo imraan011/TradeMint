@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import CartModel from "../models/cart.model.js";
 
 export async function getCartController(req, res) {
@@ -133,4 +134,88 @@ export async function updateCartItemController(req, res) {
     }
 }
 
-export async function removeCartItemController(req, res) {}
+export async function removeCartItemController(req, res) {
+    try {
+        const productId = req.params.productId || req.body?.productId;
+
+        if (!mongoose.Types.ObjectId.isValid(productId)) {
+            return res.status(400).json({
+                success: false,
+                error: { message: "Invalid productId: must be a valid ObjectId" },
+            });
+        }
+
+        // JWT payload se user id nikalo — id ya _id dono support karo
+        const userId = req.user?.id || req.user?._id;
+
+        const cart = await CartModel.findOne({ user: userId });
+
+        if (!cart) {
+            return res.status(404).json({
+                success: false,
+                error: { message: "Cart not found" },
+            });
+        }
+
+        const existingItemIndex = cart.items.findIndex((item) => item.productId.toString() === productId);
+
+        if (existingItemIndex === -1) {
+            return res.status(404).json({
+                success: false,
+                error: { message: "Item not found in cart" },
+            });
+        }
+
+        // Item ko cart se remove karo
+        cart.items.splice(existingItemIndex, 1);
+
+        await cart.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Item removed from cart successfully",
+            cart,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: error.message || "Failed to remove item from cart" },
+        });
+    }
+}
+
+export async function clearCartController(req, res) {
+    try {
+        const userId = req.user?.id || req.user?._id;
+
+        const cart = await CartModel.findOne({ user: userId });
+
+        if (!cart) {
+            // Idempotent: cart pehle se nahi hai tab bhi 200 OK
+            return res.status(200).json({
+                success: true,
+                message: "Cart cleared successfully",
+                cart: {
+                    items: [],
+                    totalAmount: 0,
+                },
+            });
+        }
+
+        // Cart ke items aur total clear karo
+        cart.items = [];
+        cart.totalAmount = 0;
+        await cart.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Cart cleared successfully",
+            data: { cart },
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: error.message || "Failed to clear cart" },
+        });
+    }
+}
