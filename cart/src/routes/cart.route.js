@@ -1,5 +1,11 @@
 import express from "express";
-import { addToCartController, clearCartController, getCartController, removeCartItemController, updateCartItemController } from "../controller/cart.controller.js";
+import {
+    addToCartController,
+    clearCartController,
+    getCartController,
+    removeCartItemController,
+    updateCartItemController,
+} from "../controllers/cart.controller.js";
 import { createAuthMiddleware } from "../middlewares/auth.middleware.js";
 import { validateAddToCart, validateUpdateCart } from "../middlewares/validation.middleware.js";
 
