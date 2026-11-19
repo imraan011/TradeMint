@@ -1,21 +1,23 @@
 /**
  * Test suite for POST /api/orders
  *
- * Spec:
- * 1. Creates an order from the authenticated user's current cart.
- * 2. Copies priced items from cart to order.
- * 3. Computes taxes and shipping charges, sets totalAmount.
- * 4. Sets initial order status to "pending".
- * 5. Reserves inventory and emits order.created event/status.
- * 6. Returns 400 if user's cart is empty or does not exist.
- * 7. Requires valid authentication (Bearer token or cookie).
+ * Architecture Spec:
+ * 1. Creates an order securely by fetching the user's cart from Cart Service (Prevents Client-Side Tampering).
+ * 2. Fetches authoritative prices from Product Service.
+ * 3. Client ONLY sends { shippingAddress }. No items/prices accepted from client.
+ * 4. Computes taxes and shipping charges, sets totalAmount.
+ * 5. Sets initial order status to "pending".
+ * 6. Returns 400 if user's cart is empty.
+ * 7. Returns 400 if shipping address is missing or incomplete.
+ * 8. Requires valid authentication (Bearer token or cookie).
  */
 
-import { describe, it, expect } from "@jest/globals";
+import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import "dotenv/config";
 import request from "supertest";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
+import axios from "axios";
 import { app } from "../app.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "test_jwt_secret";
@@ -44,26 +46,59 @@ const sampleAddress = {
 };
 
 describe("POST /api/orders", () => {
+    const mockProductId = new mongoose.Types.ObjectId().toString();
+
+    beforeEach(() => {
+        // Mock external microservices (Cart Service & Product Service)
+        jest.spyOn(axios, "get").mockImplementation((url) => {
+            // Cart Service mock
+            if (url.includes(":3002/api/cart")) {
+                return Promise.resolve({
+                    data: {
+                        cart: {
+                            items: [
+                                {
+                                    productId: mockProductId,
+                                    quantity: 2,
+                                },
+                            ],
+                        },
+                    },
+                });
+            }
+
+            // Product Service mock
+            if (url.includes(":3001/api/products")) {
+                return Promise.resolve({
+                    data: {
+                        productData: {
+                            _id: mockProductId,
+                            title: "Wireless Mouse",
+                            price: {
+                                amount: 500,
+                                currency: "INR",
+                            },
+                            stock: 10,
+                        },
+                    },
+                });
+            }
+
+            return Promise.reject(new Error(`Unhandled URL in test mock: ${url}`));
+        });
+    });
+
     // ═══════════════════════════════════════════════════════════════════════════
-    // 1. Happy Path & Order Creation
+    // 1. Happy Path & Order Creation (Secure from Cart)
     // ═══════════════════════════════════════════════════════════════════════════
     describe("Successful Order Creation", () => {
-        it("should successfully create an order from user cart with status=pending", async () => {
-            const { token, user } = generateAuthToken();
-            const productId = new mongoose.Types.ObjectId().toString();
+        it("should successfully create an order from user's server cart with status=pending", async () => {
+            const { token } = generateAuthToken();
 
             const res = await request(app)
                 .post("/api/orders")
                 .set("Authorization", `Bearer ${token}`)
                 .send({
-                    items: [
-                        {
-                            productId,
-                            title: "Wireless Mouse",
-                            price: 500,
-                            quantity: 2,
-                        },
-                    ],
                     shippingAddress: sampleAddress,
                 });
 
@@ -74,8 +109,9 @@ describe("POST /api/orders", () => {
             expect(order).toBeDefined();
             expect(order.status).toBe("pending");
             expect(order.items).toHaveLength(1);
-            expect(order.items[0].productId.toString()).toBe(productId);
+            expect(order.items[0].productId.toString()).toBe(mockProductId);
             expect(order.items[0].quantity).toBe(2);
+            expect(order.items[0].price.amount).toBe(500);
         });
 
         it("should compute taxes and shipping charges in order totals", async () => {
@@ -85,14 +121,6 @@ describe("POST /api/orders", () => {
                 .post("/api/orders")
                 .set("Authorization", `Bearer ${token}`)
                 .send({
-                    items: [
-                        {
-                            productId: new mongoose.Types.ObjectId().toString(),
-                            title: "Mechanical Keyboard",
-                            price: 2000,
-                            quantity: 1,
-                        },
-                    ],
                     shippingAddress: sampleAddress,
                 });
 
@@ -110,14 +138,6 @@ describe("POST /api/orders", () => {
                 .post("/api/orders")
                 .set("Cookie", [`token=${token}`])
                 .send({
-                    items: [
-                        {
-                            productId: new mongoose.Types.ObjectId().toString(),
-                            title: "USB Cable",
-                            price: 150,
-                            quantity: 1,
-                        },
-                    ],
                     shippingAddress: sampleAddress,
                 });
 
@@ -130,20 +150,30 @@ describe("POST /api/orders", () => {
     // 2. Input & Cart Validations (400 Bad Request)
     // ═══════════════════════════════════════════════════════════════════════════
     describe("Input & Cart Validations", () => {
-        it("should return 400 when order items array is empty", async () => {
+        it("should return 400 when user cart is empty", async () => {
             const { token } = generateAuthToken();
+
+            // Mock empty cart
+            jest.spyOn(axios, "get").mockImplementationOnce(() =>
+                Promise.resolve({
+                    data: {
+                        cart: {
+                            items: [],
+                        },
+                    },
+                }),
+            );
 
             const res = await request(app)
                 .post("/api/orders")
                 .set("Authorization", `Bearer ${token}`)
                 .send({
-                    items: [],
                     shippingAddress: sampleAddress,
                 });
 
             expect(res.status).toBe(400);
             expect(res.body.success).toBe(false);
-            expect(res.body.error.message).toMatch(/empty|item.*required|no item/i);
+            expect(res.body.error.message).toMatch(/empty|cart/i);
         });
 
         it("should return 400 when shipping address is missing", async () => {
@@ -152,15 +182,7 @@ describe("POST /api/orders", () => {
             const res = await request(app)
                 .post("/api/orders")
                 .set("Authorization", `Bearer ${token}`)
-                .send({
-                    items: [
-                        {
-                            productId: new mongoose.Types.ObjectId().toString(),
-                            price: 100,
-                            quantity: 1,
-                        },
-                    ],
-                });
+                .send({});
 
             expect(res.status).toBe(400);
             expect(res.body.success).toBe(false);
@@ -174,13 +196,6 @@ describe("POST /api/orders", () => {
                 .post("/api/orders")
                 .set("Authorization", `Bearer ${token}`)
                 .send({
-                    items: [
-                        {
-                            productId: new mongoose.Types.ObjectId().toString(),
-                            price: 100,
-                            quantity: 1,
-                        },
-                    ],
                     shippingAddress: { city: "Bengaluru" }, // missing street, pincode, etc.
                 });
 
@@ -196,7 +211,7 @@ describe("POST /api/orders", () => {
         it("should return 401 when Authorization header is missing", async () => {
             const res = await request(app)
                 .post("/api/orders")
-                .send({ items: [], shippingAddress: sampleAddress });
+                .send({ shippingAddress: sampleAddress });
 
             expect(res.status).toBe(401);
             expect(res.body.success).toBe(false);
@@ -206,7 +221,7 @@ describe("POST /api/orders", () => {
             const res = await request(app)
                 .post("/api/orders")
                 .set("Authorization", "Bearer invalid.fake.token")
-                .send({ items: [], shippingAddress: sampleAddress });
+                .send({ shippingAddress: sampleAddress });
 
             expect(res.status).toBe(401);
             expect(res.body.success).toBe(false);

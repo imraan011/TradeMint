@@ -64,18 +64,30 @@ const orderSchema = new mongoose.Schema(
         ],
         status: {
             type: String,
-            enum: ["PENDING", "CONFIRMED", "SHIPPED", "DELIVERED", "CANCELLED"],
+            enum: [
+                "PENDING",
+                "CONFIRMED",
+                "SHIPPED",
+                "DELIVERED",
+                "CANCELLED",
+                "pending",
+                "confirmed",
+                "shipped",
+                "delivered",
+                "cancelled",
+            ],
         },
         totalAmount: {
-            amount: {
-                type: Number,
-                required: true,
-            },
-            currency: {
-                type: String,
-                required: true,
-                enum: ["USD", "INR"],
-            },
+            type: Number,
+            required: true,
+        },
+        tax: {
+            type: Number,
+            default: 0,
+        },
+        shippingCharges: {
+            type: Number,
+            default: 0,
         },
     },
     { timestamps: true },

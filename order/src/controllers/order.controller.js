@@ -6,78 +6,91 @@ export const createOrderController = async (req, res) => {
         const user = req.user;
         const token = req.cookies?.token || req.headers?.authorization?.split(" ")[1];
         if (!token) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
+            return res.status(401).json({ success: false, error: { message: "Unauthorized" } });
         }
 
-        try {
-            //fetch user's cart from cart service
-            const cartResponse = await axios.get(`http://localhost:3002/api/cart`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+        const { shippingAddress } = req.body;
+
+        // 1. Fetch user's cart from Cart Service (Prevents Client-Side Tampering)
+        const cartResponse = await axios.get(`http://localhost:3002/api/cart`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        });
+
+        const cartItems = cartResponse.data.cart?.items;
+        if (!cartItems || cartItems.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: { message: "Cart is empty. Cannot create order." },
             });
+        }
 
-            const products = await Promise.all(
-                cartResponse.data.cart.items.map(async (items) => {
-                    const response = await axios.get(`http://localhost:3001/api/products/${items.productId}`, {
-                        headers: {
-                            Authorization: `Bearer ${token}`,
-                        },
-                    });
-                    return response.data.productData;
-                }),
-            );
-
-            let priceAmount = 0;
-            const orderItems = cartResponse.data.cart.items.map((item, index) => {
-                const product = products.find((p) => p._id.toString() == item.productId.toString());
-
-                if (product.stock === undefined || product.stock === null || product.stock < item.quantity) {
-                    throw new Error(`Product ${product.title} is out of stock`);
-                }
-                const itemPrice = product.price.amount * item.quantity;
-                priceAmount += itemPrice;
-                return {
-                    productId: item.productId,
-                    quantity: item.quantity,
-                    price: {
-                        amount: itemPrice,
-                        currency: product.price.currency,
+        // 2. Fetch authoritative price and stock from Product Service
+        const products = await Promise.all(
+            cartItems.map(async (cartItem) => {
+                const response = await axios.get(`http://localhost:3001/api/products/${cartItem.productId}`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
                     },
-                };
-            });
-
-            const shippingAddress = req.body?.shippingAddress;
-
-            if (!shippingAddress) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Shipping address is required to place an order!",
                 });
+                return response.data.productData || response.data;
+            }),
+        );
+
+        let itemSubtotal = 0;
+        const orderItems = cartItems.map((cartItem) => {
+            const product = products.find((p) => p._id.toString() === cartItem.productId.toString());
+
+            if (!product) {
+                throw new Error(`Product not found: ${cartItem.productId}`);
             }
 
-            const order = new OrderModel({
-                user: user.id || user._id,
-                shippingAddress,
-                items: orderItems,
-                status: "PENDING",
-                totalAmount: {
-                    amount: priceAmount,
-                    currency: orderItems[0].price.currency || "INR",
-                },
-            });
-            await order.save();
-            console.log("Order saved successfully in DB:", order._id);
+            if (product.stock !== undefined && product.stock !== null && product.stock < cartItem.quantity) {
+                throw new Error(`Product ${product.title} is out of stock`);
+            }
 
-            return res.status(201).json({
-                success: true,
-                message: "Order created successfully",
-                data: { order },
-            });
-        } catch (error) {
-            res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
-        }
+            const unitPrice = product.price.amount;
+            const itemPrice = unitPrice * cartItem.quantity;
+            itemSubtotal += itemPrice;
+
+            return {
+                productId: cartItem.productId,
+                quantity: cartItem.quantity,
+                price: {
+                    amount: unitPrice,
+                    currency: product.price.currency || "INR",
+                },
+            };
+        });
+
+        // 3. Compute taxes and shipping charges
+        const tax = Math.round(itemSubtotal * 0.18);
+        const shippingCharges = itemSubtotal > 1000 ? 0 : 50;
+        const totalAmount = itemSubtotal + tax + shippingCharges;
+
+        // 4. Create and save order in Database
+        const order = new OrderModel({
+            user: user.id || user._id,
+            shippingAddress,
+            items: orderItems,
+            status: "pending",
+            totalAmount,
+            tax,
+            shippingCharges,
+        });
+
+        await order.save();
+
+        return res.status(201).json({
+            success: true,
+            message: "Order created successfully",
+            data: { order },
+        });
     } catch (error) {
-        res.status(500).json({ success: false, message: "Internal Server Error", error: error.message });
+        return res.status(500).json({
+            success: false,
+            error: { message: error.message || "Internal Server Error" },
+        });
     }
 };
