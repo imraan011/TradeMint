@@ -3,12 +3,14 @@
  *
  * Spec:
  * 1. Updates delivery address prior to payment capture (status=pending).
- * 2. Validates address fields (street, city, state, pincode, phone).
- * 3. Rejects with 400 if order status is no longer eligible for address change (e.g. shipped/delivered).
- * 4. Buyer Isolation: Returns 403 if User A attempts to update User B's order delivery address.
- * 5. Returns 404 if order does not exist.
- * 6. Returns 400 if order ID format is invalid.
- * 7. Requires valid authentication (Bearer token).
+ * 2. Rejects with 400 if deliveryAddress payload is missing.
+ * 3. Buyer Isolation: Returns 403 if User A attempts to update User B's order.
+ * 4. Returns 404 if order does not exist.
+ * 5. Returns 400 if order ID format is invalid.
+ * 6. Requires valid authentication (Bearer token).
+ *
+ * Pattern: OrderModel.create() se DB seed karo — no POST /api/orders needed.
+ * Client kabhi items/prices send nahi karta (CWE-472).
  */
 
 import { describe, it, expect } from "@jest/globals";
@@ -17,6 +19,7 @@ import request from "supertest";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import { app } from "../app.js";
+import OrderModel from "../models/order.model.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "test_jwt_secret";
 
@@ -39,7 +42,6 @@ const initialAddress = {
     state: "Karnataka",
     pincode: "560001",
     country: "India",
-    phone: "9876543210",
 };
 
 const updatedAddress = {
@@ -48,68 +50,65 @@ const updatedAddress = {
     state: "Karnataka",
     pincode: "560038",
     country: "India",
-    phone: "9123456780",
 };
+
+/** DB seed helper */
+const seedOrder = (userId, overrides = {}) =>
+    OrderModel.create({
+        user: userId,
+        shippingAddress: initialAddress,
+        items: [
+            {
+                productId: new mongoose.Types.ObjectId(),
+                quantity: 1,
+                price: { amount: 750, currency: "INR" },
+            },
+        ],
+        status: "pending",
+        totalAmount: 935,
+        tax: 135,
+        shippingCharges: 50,
+        ...overrides,
+    });
 
 describe("PATCH /api/orders/:id/address", () => {
     // ═══════════════════════════════════════════════════════════════════════════
     // 1. Happy Path & Address Update
     // ═══════════════════════════════════════════════════════════════════════════
     describe("Successful Address Update", () => {
-        it("should successfully update delivery address prior to payment capture", async () => {
-            const { token } = generateAuthToken();
-            const productId = new mongoose.Types.ObjectId().toString();
+        it("should successfully update delivery address on a pending order", async () => {
+            const { token, user } = generateAuthToken();
 
-            // Pehle order create karo (status=pending)
-            const createRes = await request(app)
-                .post("/api/orders")
-                .set("Authorization", `Bearer ${token}`)
-                .send({
-                    items: [{ productId, title: "Desk Lamp", price: 750, quantity: 1 }],
-                    shippingAddress: initialAddress,
-                });
+            const seeded = await seedOrder(user.id);
 
-            const createdOrder = createRes.body.data?.order || createRes.body.order || createRes.body.data;
-            const orderId = createdOrder._id || createdOrder.id;
-
-            // Address update karo
             const res = await request(app)
-                .patch(`/api/orders/${orderId}/address`)
+                .patch(`/api/orders/${seeded._id}/address`)
                 .set("Authorization", `Bearer ${token}`)
                 .send({ deliveryAddress: updatedAddress });
 
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
 
-            const order = res.body.data?.order || res.body.order || res.body.data;
-            const savedAddress = order.shippingAddress || order.deliveryAddress;
+            const order = res.body.data?.order ?? res.body.order ?? res.body.data;
+            const savedAddress = order.shippingAddress ?? order.deliveryAddress;
             expect(savedAddress.street).toBe(updatedAddress.street);
             expect(savedAddress.pincode).toBe(updatedAddress.pincode);
         });
 
-        it("should prevent User A from updating User B's order delivery address", async () => {
-            const { token: userAToken } = generateAuthToken();
+        it("should prevent User A from updating User B's order address (403)", async () => {
+            const { user: userA } = generateAuthToken();
             const { token: userBToken } = generateAuthToken();
 
-            // User A order banata hai
-            const createRes = await request(app)
-                .post("/api/orders")
-                .set("Authorization", `Bearer ${userAToken}`)
-                .send({
-                    items: [{ productId: new mongoose.Types.ObjectId().toString(), price: 600, quantity: 1 }],
-                    shippingAddress: initialAddress,
-                });
+            // User A ka order DB mein daal do
+            const seeded = await seedOrder(userA.id);
 
-            const orderA = createRes.body.data?.order || createRes.body.order || createRes.body.data;
-            const orderAId = orderA._id || orderA.id;
-
-            // User B address update karne ki koshish karega
+            // User B update karne ki koshish karega
             const res = await request(app)
-                .patch(`/api/orders/${orderAId}/address`)
+                .patch(`/api/orders/${seeded._id}/address`)
                 .set("Authorization", `Bearer ${userBToken}`)
                 .send({ deliveryAddress: updatedAddress });
 
-            expect([403, 404]).toContain(res.status);
+            expect(res.status).toBe(403);
             expect(res.body.success).toBe(false);
         });
     });

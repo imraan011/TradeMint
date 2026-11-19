@@ -16,6 +16,7 @@ import request from "supertest";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import { app } from "../app.js";
+import OrderModel from "../models/order.model.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "test_jwt_secret";
 
@@ -47,55 +48,62 @@ describe("GET /api/orders/:id", () => {
     // ═══════════════════════════════════════════════════════════════════════════
     describe("Successful Order Retrieval", () => {
         it("should return order details with timeline and payment summary", async () => {
-            const { token } = generateAuthToken();
+            const { token, user } = generateAuthToken();
             const productId = new mongoose.Types.ObjectId().toString();
 
-            // Pehle order create karo
-            const createRes = await request(app)
-                .post("/api/orders")
-                .set("Authorization", `Bearer ${token}`)
-                .send({
-                    items: [{ productId, title: "Laptop Stand", price: 1200, quantity: 1 }],
-                    shippingAddress: sampleAddress,
-                });
+            // Direct DB seeding — isolated unit testing
+            const order = await OrderModel.create({
+                user: user.id,
+                shippingAddress: sampleAddress,
+                items: [
+                    {
+                        productId,
+                        quantity: 1,
+                        price: { amount: 1200, currency: "INR" },
+                    },
+                ],
+                status: "pending",
+                totalAmount: 1466,
+                tax: 216,
+                shippingCharges: 50,
+            });
 
-            const createdOrder = createRes.body.data?.order || createRes.body.order || createRes.body.data;
-            const orderId = createdOrder._id || createdOrder.id;
-
-            // GET /api/orders/:id fetch karo
             const res = await request(app)
-                .get(`/api/orders/${orderId}`)
+                .get(`/api/orders/${order._id}`)
                 .set("Authorization", `Bearer ${token}`);
 
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
 
-            const order = res.body.data?.order || res.body.order || res.body.data;
-            expect(order).toBeDefined();
-            expect(order._id?.toString() || order.id?.toString()).toBe(orderId.toString());
-            expect(order.status).toBeDefined();
-            expect(order.items).toHaveLength(1);
+            const fetchedOrder = res.body.data?.order || res.body.order || res.body.data;
+            expect(fetchedOrder).toBeDefined();
+            expect(fetchedOrder._id?.toString() || fetchedOrder.id?.toString()).toBe(order._id.toString());
+            expect(fetchedOrder.status).toBeDefined();
+            expect(fetchedOrder.items).toHaveLength(1);
         });
 
         it("should prevent User A from accessing User B's order (Buyer Isolation)", async () => {
-            const { token: tokenUserA } = generateAuthToken();
+            const { user: userA } = generateAuthToken();
             const { token: tokenUserB } = generateAuthToken();
 
-            // User A order banata hai
-            const createRes = await request(app)
-                .post("/api/orders")
-                .set("Authorization", `Bearer ${tokenUserA}`)
-                .send({
-                    items: [{ productId: new mongoose.Types.ObjectId().toString(), price: 500, quantity: 1 }],
-                    shippingAddress: sampleAddress,
-                });
-
-            const orderA = createRes.body.data?.order || createRes.body.order || createRes.body.data;
-            const orderAId = orderA._id || orderA.id;
+            // User A ka order DB mein create karo
+            const orderA = await OrderModel.create({
+                user: userA.id,
+                shippingAddress: sampleAddress,
+                items: [
+                    {
+                        productId: new mongoose.Types.ObjectId().toString(),
+                        quantity: 1,
+                        price: { amount: 500, currency: "INR" },
+                    },
+                ],
+                status: "pending",
+                totalAmount: 500,
+            });
 
             // User B us order ko fetch karne ki koshish karega
             const res = await request(app)
-                .get(`/api/orders/${orderAId}`)
+                .get(`/api/orders/${orderA._id}`)
                 .set("Authorization", `Bearer ${tokenUserB}`);
 
             // 403 Forbidden ya 404 Not Found return hona chahiye

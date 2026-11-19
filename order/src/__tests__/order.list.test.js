@@ -4,9 +4,12 @@
  * Spec:
  * 1. Fetches a paginated list of all orders belonging to the authenticated customer.
  * 2. Returns empty array if customer has not placed any orders yet.
- * 3. Supports pagination via query parameters (limit & skip/page).
+ * 3. Supports pagination via query parameters (limit & page).
  * 4. Customer Isolation: User A only receives their own orders, never orders from User B.
- * 5. Requires valid authentication (Bearer token or cookie).
+ * 5. Requires valid authentication (Bearer token).
+ *
+ * Pattern: OrderModel.create() se DB seed karo — no POST /api/orders needed here.
+ * Client kabhi items/prices send nahi karta (CWE-472).
  */
 
 import { describe, it, expect } from "@jest/globals";
@@ -15,6 +18,7 @@ import request from "supertest";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import { app } from "../app.js";
+import OrderModel from "../models/order.model.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "test_jwt_secret";
 
@@ -37,8 +41,26 @@ const sampleAddress = {
     state: "Karnataka",
     pincode: "560001",
     country: "India",
-    phone: "9876543210",
 };
+
+/** DB seed helper — ek order directly DB mein daal deta hai */
+const seedOrder = (userId, overrides = {}) =>
+    OrderModel.create({
+        user: userId,
+        shippingAddress: sampleAddress,
+        items: [
+            {
+                productId: new mongoose.Types.ObjectId(),
+                quantity: 1,
+                price: { amount: 500, currency: "INR" },
+            },
+        ],
+        status: "pending",
+        totalAmount: 640,
+        tax: 90,
+        shippingCharges: 50,
+        ...overrides,
+    });
 
 describe("GET /api/orders/me", () => {
     // ═══════════════════════════════════════════════════════════════════════════
@@ -55,30 +77,15 @@ describe("GET /api/orders/me", () => {
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
 
-            const orders = res.body.data?.orders || res.body.orders || res.body.data;
-            expect(orders).toBeDefined();
+            const orders = res.body.data?.orders ?? res.body.orders ?? res.body.data;
             expect(orders).toEqual([]);
         });
 
         it("should return list of orders belonging to the customer", async () => {
-            const { token } = generateAuthToken();
+            const { token, user } = generateAuthToken();
 
-            // 2 orders create karo
-            await request(app)
-                .post("/api/orders")
-                .set("Authorization", `Bearer ${token}`)
-                .send({
-                    items: [{ productId: new mongoose.Types.ObjectId().toString(), price: 300, quantity: 1 }],
-                    shippingAddress: sampleAddress,
-                });
-
-            await request(app)
-                .post("/api/orders")
-                .set("Authorization", `Bearer ${token}`)
-                .send({
-                    items: [{ productId: new mongoose.Types.ObjectId().toString(), price: 800, quantity: 2 }],
-                    shippingAddress: sampleAddress,
-                });
+            await seedOrder(user.id);
+            await seedOrder(user.id);
 
             const res = await request(app)
                 .get("/api/orders/me")
@@ -87,76 +94,50 @@ describe("GET /api/orders/me", () => {
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
 
-            const orders = res.body.data?.orders || res.body.orders || res.body.data;
+            const orders = res.body.data?.orders ?? res.body.orders ?? res.body.data;
             expect(orders).toHaveLength(2);
         });
 
         it("should ensure Customer Isolation (User A only sees their own orders)", async () => {
-            const { token: userAToken } = generateAuthToken();
-            const { token: userBToken } = generateAuthToken();
+            const { token: userAToken, user: userA } = generateAuthToken();
+            const { token: userBToken, user: userB } = generateAuthToken();
 
-            // User A creates 1 order
-            await request(app)
-                .post("/api/orders")
-                .set("Authorization", `Bearer ${userAToken}`)
-                .send({
-                    items: [{ productId: new mongoose.Types.ObjectId().toString(), price: 200, quantity: 1 }],
-                    shippingAddress: sampleAddress,
-                });
+            // User A ka 1 order
+            await seedOrder(userA.id);
 
-            // User B creates 2 orders
-            await request(app)
-                .post("/api/orders")
-                .set("Authorization", `Bearer ${userBToken}`)
-                .send({
-                    items: [{ productId: new mongoose.Types.ObjectId().toString(), price: 400, quantity: 1 }],
-                    shippingAddress: sampleAddress,
-                });
-            await request(app)
-                .post("/api/orders")
-                .set("Authorization", `Bearer ${userBToken}`)
-                .send({
-                    items: [{ productId: new mongoose.Types.ObjectId().toString(), price: 900, quantity: 1 }],
-                    shippingAddress: sampleAddress,
-                });
+            // User B ke 2 orders
+            await seedOrder(userB.id);
+            await seedOrder(userB.id);
 
-            // User A fetch karega
             const resA = await request(app)
                 .get("/api/orders/me")
                 .set("Authorization", `Bearer ${userAToken}`);
 
-            const ordersA = resA.body.data?.orders || resA.body.orders || resA.body.data;
+            const ordersA = resA.body.data?.orders ?? resA.body.orders ?? resA.body.data;
             expect(ordersA).toHaveLength(1);
 
-            // User B fetch karega
             const resB = await request(app)
                 .get("/api/orders/me")
                 .set("Authorization", `Bearer ${userBToken}`);
 
-            const ordersB = resB.body.data?.orders || resB.body.orders || resB.body.data;
+            const ordersB = resB.body.data?.orders ?? resB.body.orders ?? resB.body.data;
             expect(ordersB).toHaveLength(2);
         });
 
         it("should support pagination with limit query parameter", async () => {
-            const { token } = generateAuthToken();
+            const { token, user } = generateAuthToken();
 
-            // 3 orders create karo
-            for (let i = 0; i < 3; i++) {
-                await request(app)
-                    .post("/api/orders")
-                    .set("Authorization", `Bearer ${token}`)
-                    .send({
-                        items: [{ productId: new mongoose.Types.ObjectId().toString(), price: 100 * (i + 1), quantity: 1 }],
-                        shippingAddress: sampleAddress,
-                    });
-            }
+            // 3 orders seed karo
+            await seedOrder(user.id);
+            await seedOrder(user.id);
+            await seedOrder(user.id);
 
             const res = await request(app)
                 .get("/api/orders/me?limit=2")
                 .set("Authorization", `Bearer ${token}`);
 
             expect(res.status).toBe(200);
-            const orders = res.body.data?.orders || res.body.orders || res.body.data;
+            const orders = res.body.data?.orders ?? res.body.orders ?? res.body.data;
             expect(orders).toHaveLength(2);
         });
     });
