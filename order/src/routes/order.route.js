@@ -2,6 +2,7 @@ import express from "express";
 import { createAuthMiddleware } from "../middlewares/auth.middleware.js";
 import {
     createOrderController,
+    deleteOrderController,
     getOrderByIdController,
     getUserOrdersController,
 } from "../controllers/order.controller.js";
@@ -14,5 +15,7 @@ router.post("/", createAuthMiddleware(["User", "USER"]), createOrderValidations,
 router.get("/me", createAuthMiddleware(["User", "USER"]), getUserOrdersController);
 
 router.get("/:orderId", createAuthMiddleware(["User", "USER"]), getOrderByIdController);
+
+router.post("/:orderId/cancel", createAuthMiddleware(["User", "USER"]), deleteOrderController);
 
 export default router;

@@ -167,3 +167,51 @@ export const getOrderByIdController = async (req, res) => {
         });
     }
 };
+
+export const deleteOrderController = async (req, res) => {
+    const user = req.user;
+    const { orderId } = req.params;
+    if(!mongoose.Types.ObjectId.isValid(orderId)) {
+        return res.status(400).json({
+            success: false,
+            error: { message: "Invalid order ID" },
+        });
+    }
+
+    try {
+        const order = await OrderModel.findOne({ _id: orderId, user: user.id || user._id });
+
+        if (!order) {
+            const exists = await OrderModel.exists({ _id: orderId });
+            if (exists) {
+                return res.status(403).json({ success: false, error: { message: "Forbidden" } });
+            }
+            return res.status(404).json({
+                success: false,
+                error: { message: "Order not found" },
+            });
+        }
+
+        if (order.status !== "pending" && order.status !== "PENDING") {
+            return res.status(400).json({
+                success: false,
+                error: { message: "Order is already cancelled or cannot be cancelled" },
+            });
+        }
+        
+        order.status = "canceled";
+        order.canceledAt = new Date();
+        await order.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Order canceled successfully",
+            order,
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: error.message || "Internal Server Error" },
+        });
+    }
+};
