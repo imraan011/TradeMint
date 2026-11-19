@@ -94,3 +94,48 @@ export const createOrderController = async (req, res) => {
         });
     }
 };
+
+export const getUserOrdersController = async (req, res) => {
+    try {
+        const user = req.user;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        const orders = await OrderModel.find({ user: user.id || user._id })
+            //-1 shows latest orders first, 1 shows oldest orders first
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+        const totalOrders = await OrderModel.countDocuments({ user: user.id || user._id });
+
+        return res.status(200).json({
+            success: true,
+            message: "User orders fetched successfully",
+            orders,
+            meta: {
+                total: totalOrders,
+                page,
+                limit,
+                totalPages: Math.ceil(totalOrders / limit),
+            },
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: error.message || "Internal Server Error" },
+        });
+    }
+};
+
+export const getOrderByIdController = async (req, res) => {
+    const { orderId } = req.params;
+    try {
+        const order = await OrderModel.findById(orderId);
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            error: { message: error.message || "Internal Server Error" },
+        });
+    }
+};

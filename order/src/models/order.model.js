@@ -76,6 +76,7 @@ const orderSchema = new mongoose.Schema(
                 "delivered",
                 "cancelled",
             ],
+            default: "PENDING",
         },
         totalAmount: {
             type: Number,
