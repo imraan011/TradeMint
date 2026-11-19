@@ -33,7 +33,10 @@ const orderSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             required: true,
         },
-        shippingAddress: addressSchema,
+        shippingAddress: {
+            type: addressSchema,
+            required: true,
+        },
         items: [
             {
                 productId: {
