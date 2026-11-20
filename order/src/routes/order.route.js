@@ -5,8 +5,9 @@ import {
     deleteOrderController,
     getOrderByIdController,
     getUserOrdersController,
+    updateOrderAddressController,
 } from "../controllers/order.controller.js";
-import { createOrderValidations } from "../middlewares/validation.middleware.js";
+import { createOrderValidations, updateOrderAddressValidations } from "../middlewares/validation.middleware.js";
 
 const router = express.Router();
 
@@ -17,5 +18,12 @@ router.get("/me", createAuthMiddleware(["User", "USER"]), getUserOrdersControlle
 router.get("/:orderId", createAuthMiddleware(["User", "USER"]), getOrderByIdController);
 
 router.post("/:orderId/cancel", createAuthMiddleware(["User", "USER"]), deleteOrderController);
+
+router.patch(
+    "/:orderId/address",
+    createAuthMiddleware(["User", "USER"]),
+    updateOrderAddressValidations,
+    updateOrderAddressController,
+);
 
 export default router;

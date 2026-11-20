@@ -3,7 +3,7 @@
  *
  * Spec:
  * 1. Updates delivery address prior to payment capture (status=pending).
- * 2. Rejects with 400 if deliveryAddress payload is missing.
+ * 2. Rejects with 400 if shippingAddress payload is missing.
  * 3. Buyer Isolation: Returns 403 if User A attempts to update User B's order.
  * 4. Returns 404 if order does not exist.
  * 5. Returns 400 if order ID format is invalid.
@@ -84,13 +84,13 @@ describe("PATCH /api/orders/:id/address", () => {
             const res = await request(app)
                 .patch(`/api/orders/${seeded._id}/address`)
                 .set("Authorization", `Bearer ${token}`)
-                .send({ deliveryAddress: updatedAddress });
+                .send({ shippingAddress: updatedAddress });
 
             expect(res.status).toBe(200);
             expect(res.body.success).toBe(true);
 
             const order = res.body.data?.order ?? res.body.order ?? res.body.data;
-            const savedAddress = order.shippingAddress ?? order.deliveryAddress;
+            const savedAddress = order.shippingAddress ?? order.shippingAddress;
             expect(savedAddress.street).toBe(updatedAddress.street);
             expect(savedAddress.pincode).toBe(updatedAddress.pincode);
         });
@@ -106,7 +106,7 @@ describe("PATCH /api/orders/:id/address", () => {
             const res = await request(app)
                 .patch(`/api/orders/${seeded._id}/address`)
                 .set("Authorization", `Bearer ${userBToken}`)
-                .send({ deliveryAddress: updatedAddress });
+                .send({ shippingAddress: updatedAddress });
 
             expect(res.status).toBe(403);
             expect(res.body.success).toBe(false);
@@ -138,7 +138,7 @@ describe("PATCH /api/orders/:id/address", () => {
             const res = await request(app)
                 .patch(`/api/orders/${nonExistentId}/address`)
                 .set("Authorization", `Bearer ${token}`)
-                .send({ deliveryAddress: updatedAddress });
+                .send({ shippingAddress: updatedAddress });
 
             expect(res.status).toBe(404);
             expect(res.body.success).toBe(false);
@@ -150,7 +150,7 @@ describe("PATCH /api/orders/:id/address", () => {
             const res = await request(app)
                 .patch("/api/orders/invalid-object-id/address")
                 .set("Authorization", `Bearer ${token}`)
-                .send({ deliveryAddress: updatedAddress });
+                .send({ shippingAddress: updatedAddress });
 
             expect(res.status).toBe(400);
             expect(res.body.success).toBe(false);
@@ -166,7 +166,7 @@ describe("PATCH /api/orders/:id/address", () => {
             const randomId = new mongoose.Types.ObjectId().toString();
             const res = await request(app)
                 .patch(`/api/orders/${randomId}/address`)
-                .send({ deliveryAddress: updatedAddress });
+                .send({ shippingAddress: updatedAddress });
 
             expect(res.status).toBe(401);
             expect(res.body.success).toBe(false);
@@ -177,7 +177,7 @@ describe("PATCH /api/orders/:id/address", () => {
             const res = await request(app)
                 .patch(`/api/orders/${randomId}/address`)
                 .set("Authorization", "Bearer invalid.fake.token")
-                .send({ deliveryAddress: updatedAddress });
+                .send({ shippingAddress: updatedAddress });
 
             expect(res.status).toBe(401);
             expect(res.body.success).toBe(false);
