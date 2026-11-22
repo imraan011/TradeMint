@@ -40,6 +40,7 @@ export const createPaymentController = async (req, res) => {
             payment,
         });
     } catch (error) {
+        console.error("Error creating payment:", error);
         return res.status(500).json({ success: false, error: { message: error.message || "Internal server error" } });
     }
 };
@@ -85,6 +86,7 @@ export const verifyPaymentController = async (req, res) => {
             payment,
         });
     } catch (error) {
+        console.error("Error verifying payment:", error);
         return res.status(500).json({ success: false, error: { message: error.message || "Internal server error" } });
     }
 };
