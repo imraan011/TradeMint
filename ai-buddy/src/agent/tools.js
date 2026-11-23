@@ -18,3 +18,29 @@ const searchproducts = tool(
         },
     },
 );
+
+const addProductToCart = tool(
+    async ({ productId, quantity = 1, token }) => {
+        const response = await axios.post(
+            `http://localhost:3002/api/cart/items`,
+            {
+                productId,
+                quantity,
+            },
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            },
+        );
+        return JSON.stringify(response.data);
+    },
+    {
+        name: "addProductToCart",
+        description: "Add a product to the user's cart.",
+        inputSchema: {
+            productId: z.string().describe("The ID of the product to add to the cart."),
+            quantity: z.number().describe("The quantity of the product to add to the cart.").default(1),
+        },
+    },
+);
