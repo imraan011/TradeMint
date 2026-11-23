@@ -1,9 +1,10 @@
 import { tool } from "@langchain/core/tools";
 import axios from "axios";
+import z from "zod";        
 
-const searchproducts = tool(
+export const searchproducts = tool(
     async ({ query, token }) => {
-        const response = await axios.get(`http://localhost:3001/api/products?q=${data.query}`, {
+        const response = await axios.get(`http://localhost:3001/api/products?q=${query}`, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
@@ -13,13 +14,13 @@ const searchproducts = tool(
     {
         name: "searchproducts",
         description: "Search for products based on a query and return relevant results.",
-        inputSchema: {
+        schema: {
             query: z.string().describe("The search query for products."),
         },
     },
 );
 
-const addProductToCart = tool(
+export const addProductToCart = tool(
     async ({ productId, quantity = 1, token }) => {
         const response = await axios.post(
             `http://localhost:3002/api/cart/items`,

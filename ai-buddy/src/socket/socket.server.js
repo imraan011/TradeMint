@@ -30,6 +30,7 @@ export function initSocketServer(httpServer) {
         try {
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
             socket.user = decoded;
+            socket.token = token; // Token ko socket object me store karo
             next();
         } catch (error) {
             console.warn("Socket connection rejected: Invalid token -", error.message);
@@ -39,6 +40,7 @@ export function initSocketServer(httpServer) {
 
     io.on("connection", (socket) => {
         console.log(`User connected to AI-Buddy: ${socket.user?.id || socket.id}`);
+        console.log(socket.user);
 
         socket.on("disconnect", () => {
             console.log(`User disconnected: ${socket.id}`);
