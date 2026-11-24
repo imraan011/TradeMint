@@ -1,6 +1,7 @@
 import { Server } from "socket.io";
 import { parseCookie } from "cookie";
 import jwt from "jsonwebtoken";
+import { agent } from "../agent/agent.js";
 
 export function initSocketServer(httpServer) {
     const io = new Server(httpServer, {
@@ -40,7 +41,45 @@ export function initSocketServer(httpServer) {
 
     io.on("connection", (socket) => {
         console.log(`User connected to AI-Buddy: ${socket.user?.id || socket.id}`);
-        console.log(socket.user);
+        
+
+        socket.on("message", async (data) => {
+            console.log(`Message received from ${socket.user?.id || socket.id}: ${data}`);
+            try {
+                const agentResponse = await agent.invoke(
+                    {
+                        messages: [
+                            {
+                                role: "user",
+                                content: data,
+                            },
+                        ],
+                    },
+                    {
+                        metadata: {
+                            token: socket.token,
+                        },
+                        configurable: {
+                            token: socket.token,
+                        },
+                    },
+                );
+
+                const lastMessage = agentResponse.messages[agentResponse.messages.length - 1];
+                const replyText = typeof lastMessage?.content === "string" 
+                    ? lastMessage.content 
+                    : JSON.stringify(lastMessage?.content);
+
+                console.log("\n====== AGENT RESPONSE ======");
+                console.log(replyText);
+                console.log("============================\n");
+
+                socket.emit("message", replyText || "No response");
+            } catch (error) {
+                console.error("Error in agent invocation:", error);
+                socket.emit("error", { message: error.message || "Failed to process message" });
+            }
+        });
 
         socket.on("disconnect", () => {
             console.log(`User disconnected: ${socket.id}`);

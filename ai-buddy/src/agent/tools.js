@@ -1,6 +1,6 @@
 import { tool } from "@langchain/core/tools";
 import axios from "axios";
-import z from "zod";        
+import z from "zod";
 
 export const searchproducts = tool(
     async ({ query, token }) => {
@@ -14,9 +14,10 @@ export const searchproducts = tool(
     {
         name: "searchproducts",
         description: "Search for products based on a query and return relevant results.",
-        schema: {
+        schema: z.object({
             query: z.string().describe("The search query for products."),
-        },
+            token: z.string().optional(),
+        }),
     },
 );
 
@@ -39,9 +40,11 @@ export const addProductToCart = tool(
     {
         name: "addProductToCart",
         description: "Add a product to the user's cart.",
-        inputSchema: {
+        schema: z.object({
             productId: z.string().describe("The ID of the product to add to the cart."),
             quantity: z.number().describe("The quantity of the product to add to the cart.").default(1),
-        },
+            token: z.string().optional(),
+        }),
     },
 );
+export const tools = { searchproducts, addProductToCart };
