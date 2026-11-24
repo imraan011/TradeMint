@@ -41,7 +41,6 @@ export function initSocketServer(httpServer) {
 
     io.on("connection", (socket) => {
         console.log(`User connected to AI-Buddy: ${socket.user?.id || socket.id}`);
-        
 
         socket.on("message", async (data) => {
             console.log(`Message received from ${socket.user?.id || socket.id}: ${data}`);
@@ -66,9 +65,10 @@ export function initSocketServer(httpServer) {
                 );
 
                 const lastMessage = agentResponse.messages[agentResponse.messages.length - 1];
-                const replyText = typeof lastMessage?.content === "string" 
-                    ? lastMessage.content 
-                    : JSON.stringify(lastMessage?.content);
+                const replyText =
+                    typeof lastMessage?.content === "string"
+                        ? lastMessage.content
+                        : JSON.stringify(lastMessage?.content);
 
                 console.log("\n====== AGENT RESPONSE ======");
                 console.log(replyText);
