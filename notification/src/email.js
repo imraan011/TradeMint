@@ -21,7 +21,7 @@ transporter.verify((error, success) => {
 });
 
 // Function to send email
-const sendEmail = async (to, subject, text, html) => {
+export const sendEmail = async (to, subject, text, html) => {
     try {
         const info = await transporter.sendMail({
             from: `"Your Name" <${process.env.EMAIL_USER}>`, // sender address
@@ -37,10 +37,3 @@ const sendEmail = async (to, subject, text, html) => {
         console.error("Error sending email:", error);
     }
 };
-
-sendEmail(
-    "ishtikharkhandl@gmail.com",
-    "Test Email",
-    "This is a test email sent from Node.js using Nodemailer.",
-    "<b>This is a test email sent from Node.js using Nodemailer.</b>",
-);

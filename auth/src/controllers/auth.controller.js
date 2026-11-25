@@ -4,6 +4,7 @@ import { createRequire } from "module";
 import { randomBytes } from "crypto";
 import { userModel } from "../models/user.model.js";
 import { redis } from "../db/redis.js";
+import { publishToQueue } from "../broker/broker.js";
 
 // jwt CJS hai — ESM default import me .sign undefined aata hai, isliye createRequire
 const require = createRequire(import.meta.url);
@@ -79,6 +80,7 @@ export async function registerUser(req, res) {
             roles: roles ?? "USER",
         });
 
+        // notification publish to queue with event name AUTH_NOTIFICATION.USER_CREATED in rabbitmq
         await publishToQueue("AUTH_NOTIFICATION.USER_CREATED", {
             id: user._id,
             username: user.username,
