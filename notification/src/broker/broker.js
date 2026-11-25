@@ -2,7 +2,7 @@ import amqplib from "amqplib";
 
 export let channel, connection;
 
-export async function connect() {
+export async function connectToRabbitMQ() {
     if (channel) return channel;
 
     try {
@@ -16,7 +16,7 @@ export async function connect() {
 
 export async function publishToQueue(queueName, data = {}) {
     if (!channel || !connection) {
-        await connect();
+        await connectToRabbitMQ();
     }
     await channel.assertQueue(queueName, { durable: true });
 
@@ -27,7 +27,7 @@ export async function publishToQueue(queueName, data = {}) {
 
 export async function subscribeToQueue(queueName, callback) {
     if (!channel || !connection) {
-        await connect();
+        await connectToRabbitMQ();
     }
     await channel.assertQueue(queueName, { durable: true });
 
