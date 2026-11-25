@@ -79,6 +79,14 @@ export async function registerUser(req, res) {
             roles: roles ?? "USER",
         });
 
+        await publishToQueue("AUTH_NOTIFICATION.USER_CREATED", {
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            fullname: user.fullname,
+
+        });
+
         return sendAuthResponse(res, user, 201);
     } catch (error) {
         console.error("Error in registerUser:", error);

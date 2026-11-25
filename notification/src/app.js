@@ -1,9 +1,13 @@
 import express from "express";
-import { connectToRabbitMQ } from "./broker/broker.js";
+import { connectToRabbitMQ, subscribeToQueue } from "./broker/broker.js";
+import { Broker_listener } from "./broker/listerner.js";
 
 export const app = express();
 
-connectToRabbitMQ();
+connectToRabbitMQ().then(() => {
+    Broker_listener();
+});
+
 app.use(express.json());
 
 app.get("/", (req, res) => {
