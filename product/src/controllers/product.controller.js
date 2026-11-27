@@ -27,11 +27,14 @@ export async function createProductController(req, res) {
         // ImageKit pe upload (test mode me mock ho jayega)
         const uploadedImages = await Promise.all(req.files.map((file) => uploadImage({ buffer: file.buffer })));
 
+        const stock = req.body.stock !== undefined ? Number(req.body.stock) : 10;
+
         const product = await ProductModel.create({
             title,
             description,
             price,
             seller: sellerId,
+            stock,
             image: uploadedImages.map((img) => ({
                 url: img.url,
                 thumbnail: img.thumbnailUrl,

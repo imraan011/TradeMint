@@ -7,10 +7,34 @@ export async function connectToRabbitMQ() {
 
     try {
         connection = await amqplib.connect(process.env.RABBITMQ_URL);
-        console.log("Connected to RabbitMQ");
+
+        // amqplib TLS ECONNRESET crash prevent karne ke liye
+        connection.on("error", (err) => {
+            console.error("RabbitMQ connection error:", err.message);
+            channel = null;
+            connection = null;
+        });
+        connection.on("close", () => {
+            console.warn("RabbitMQ connection closed");
+            channel = null;
+            connection = null;
+        });
+
         channel = await connection.createChannel();
+        channel.on("error", (err) => {
+            console.error("RabbitMQ channel error:", err.message);
+            channel = null;
+        });
+        channel.on("close", () => {
+            channel = null;
+        });
+
+        console.log("Connected to RabbitMQ");
+        return channel;
     } catch (error) {
-        console.error("Failed to connect to RabbitMQ:", error);
+        console.error("Failed to connect to RabbitMQ:", error.message);
+        channel = null;
+        connection = null;
     }
 }
 
