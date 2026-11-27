@@ -29,6 +29,7 @@ export async function subscribeToQueue(queueName, callback) {
     if (!channel || !connection) {
         await connectToRabbitMQ();
     }
+
     await channel.assertQueue(queueName, { durable: true });
 
     channel.consume(queueName, async (msg) => {

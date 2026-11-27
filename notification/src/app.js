@@ -1,5 +1,5 @@
 import express from "express";
-import { connectToRabbitMQ, subscribeToQueue } from "./broker/broker.js";
+import { connectToRabbitMQ } from "./broker/broker.js";
 import { Broker_listener } from "./broker/listerner.js";
 
 export const app = express();

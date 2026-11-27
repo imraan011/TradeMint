@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { PaymentModel } from "../models/payment.model.js";
 import razorpay from "../config/razorpay.js";
 import { validatePaymentVerification } from "razorpay/dist/utils/razorpay-utils.js";
+import { publishToQueue } from "../broker/broker.js";
 
 export const createPaymentController = async (req, res) => {
     try {
@@ -80,6 +81,16 @@ export const verifyPaymentController = async (req, res) => {
 
         await payment.save();
 
+        // payment.amount pehle se rupees me hai, divide by 100 nahi karna
+        await publishToQueue("PAYMENT_NOTIFICATION.PAYMENT_COMPLETED", {
+            email: req.user.email,
+            orderId: payment.order,
+            paymentId: payment._id,
+            amount: payment.amount,
+            currency: payment.currency,
+            fullname: req.user.fullname || req.user.username || "Customer",
+        });
+
         return res.status(200).json({
             success: true,
             message: "Payment verified successfully",
@@ -87,6 +98,13 @@ export const verifyPaymentController = async (req, res) => {
         });
     } catch (error) {
         console.error("Error verifying payment:", error);
+        await publishToQueue("PAYMENT_NOTIFICATION.PAYMENT_FAILED", {
+            email: req.user?.email,
+            paymentId: req.body?.razorpay_payment_id || "N/A",
+            orderId: req.body?.razorpay_order_id || "N/A",
+            error: error.message || "Payment verification failed",
+            fullname: req.user?.username || "Customer",
+        });
         return res.status(500).json({ success: false, error: { message: error.message || "Internal server error" } });
     }
 };
