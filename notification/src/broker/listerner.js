@@ -43,7 +43,7 @@ export function Broker_listener() {
 
     subscribeToQueue("PAYMENT_NOTIFICATION.PAYMENT_FAILED", async (data) => {
         console.log("Received payment failed message from queue:", data);
-        
+
         const name = getRecipientName(data.fullname || data.fullName);
         const emailHTML = `
         <p>Dear ${name},</p>
